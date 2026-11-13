@@ -144,7 +144,7 @@ def train_rectified_flow(
 ):
     for epoch in tqdm(
         range(NB_EPOCHS),
-        desc=f"Training Reflow Step",
+        desc="Training Reflow Step",
     ):
         for z0, z1 in train_dataloader:
             z0, z1 = (
@@ -154,10 +154,12 @@ def train_rectified_flow(
             # z0 shape: [batch_size, features]
             # z1 shape: [batch_size, features]
             batch_size = z1.shape[0]
-            # TODO: Part 2
             ########################
-            loss = None
-            pass
+            t = torch.rand((batch_size, 1), device=device)
+            interpolated_z = z0 + (z1 - z0) * t
+            line_directions = z1 - z0
+            drift = rectified_flow(interpolated_z, t)
+            loss = nn.MSELoss()(drift, line_directions)
             ##########################
 
             optimizer.zero_grad()
@@ -182,9 +184,18 @@ def sample(rectified_flow, T, pi_0_path):
     # pi_0_path shape: [batch_size, features]
     batch_size = pi_0_path.size(0)
     samples = [pi_0_path.clone().unsqueeze(0)]
-    # TODO: Part 3
     #####################
-    pass
+    with torch.no_grad():
+        current_points = samples[0].squeeze(0)
+        ts = torch.linspace(0, 1, T, device=pi_0_path.device).unsqueeze(1)
+        dt = 1.0 / T
+        for i in range(len(ts)-1):
+            velocity = rectified_flow(current_points, ts[i].expand(batch_size, 1))
+            current_points = current_points + velocity * dt
+            samples.append(current_points.clone().unsqueeze(0))
+    samples = torch.cat(samples, dim=0)  # Shape: [T, batch_size, features]
+    return samples
+
     ####################
 
 
@@ -203,8 +214,14 @@ def train_rectified_flow_mnist(
         for batch_idx, (z1, _) in enumerate(train_dataloader):
             # TODO: Part 4
             ##############
-            loss = None
-            pass
+            z0 = torch.randn_like(z1).to(device)  # Start from noise shape [batch_size, 1, 28, 28]
+            z1 = z1.to(device)
+            batch_size = z1.size(0)
+            t = torch.rand((batch_size, 1), device=device)
+            interpolated_z = z0 + (z1 - z0) * t.view(batch_size, 1, 1, 1)
+            line_directions = z1 - z0
+            drift = rectified_flow(interpolated_z, t)
+            loss = nn.MSELoss()(drift, line_directions)
             ##############
 
             optimizer.zero_grad()
@@ -378,7 +395,7 @@ if __name__ == "__main__":
     os.makedirs("./images", exist_ok=True)
 
     # --- Constants ---
-    device = "cuda"
+    device = "cpu"
     batch_size = 2048
     dataset_size = 10_000
     nb_epochs = 500

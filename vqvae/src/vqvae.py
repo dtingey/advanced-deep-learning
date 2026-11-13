@@ -36,7 +36,15 @@ class VQVAE(nn.Module):
         """
         # TODO: Implement the forward pass as described in the instructions.
         ###################################
-        pass
-        
+        original_x = x
+        encoded = self.enc(x)
+        B, C, H, W = encoded.shape
+        tokens = encoded.permute(0, 2, 3, 1).contiguous()  # (B, H, W, C)
+        tokens = tokens.view(B, H * W, C)  # (B, H * W, C)
+        quantized, indices, commit_loss = self.vq(tokens)  # (B, H * W, C), (B, H * W), scalar
+        quantized = quantized.view(B, H, W, C).permute(0, 3, 1, 2).contiguous()  # (B, C, H, W)
+        x_hat = self.dec(quantized)  # (B, 3, H, W)
+        reconstruction_loss = F.mse_loss(x_hat, original_x)
+
         ###################################
-        # return x_hat, reconstruction_loss + commit_loss, (H*W, self.vq.codebook_size, indices)
+        return x_hat, reconstruction_loss + commit_loss, (H*W, self.vq.codebook_size, indices)

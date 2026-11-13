@@ -79,8 +79,12 @@ class MyVectorQuantizer(nn.Module):
             Returns:
                 Tensor: Distances, shape (B*N, codebook_size).
             """
-            # TODO: Implement distance calculation as described in the instructions. 
-            pass
+            # ||z - e||^2 = ||z||^2 + ||e||^2 - 2 z e^T
+            return (
+                z.pow(2).sum(dim=1, keepdim=True)
+                + e.pow(2).sum(dim=1).unsqueeze(0)
+                - 2 * z @ e.t()
+            )
         
         z = flattened_latents
         e = self.embedding.weight
@@ -97,8 +101,10 @@ class MyVectorQuantizer(nn.Module):
                     - quantized_latents_flat (Tensor): Quantized latents, shape (B*N, D).
                     - nearest_indices_flat (Tensor): Indices of nearest codebook entries, shape (B*N,).
             """
-            # TODO: Implement finding nearest codebook vectors as described in the instructions. [Hint: Use argmin()] [One Line Each]
-            pass
+            nearest_indices_flat = distances_to_codebook.argmin(dim=1)
+            quantized_latents_flat = self.embedding(nearest_indices_flat)
+            return quantized_latents_flat, nearest_indices_flat
+            
 
         quantized_latents_flat, indices_flat = find_quantized_latents(distances)
         quantized_latents = quantized_latents_flat.view(B, N, D)
@@ -127,8 +133,7 @@ class MyVectorQuantizer(nn.Module):
                 Returns:
                     Tensor: Normalized embeddings, shape (codebook_size, D). Think "Mean of vectors assigned to each code".
                 """
-                # TODO: Implement normalization as described in the instructions. [One Line]
-                pass
+                return ema_codebook / (ema_cluster_sizes.unsqueeze(1) + epsilon)
 
             normalized_embeds = normalize_with_ema(self.ema_embeddings, self.ema_cluster_size, self.epsilon)
             self.embedding.weight.data.copy_(normalized_embeds)
@@ -148,8 +153,7 @@ class MyVectorQuantizer(nn.Module):
             Returns:
                 Tensor: Quantized latents with STE applied, shape (B, N, D).
             """
-            # TODO: Implement STE as described in the instructions. [Hint: Use detach()] [One Line]
-            pass
+            return encoded_latents + (quantized_latents - encoded_latents).detach()
 
         quantized_latents = apply_ste(quantized_latents, encoded_latents)
         quantized_indices = indices_flat.view(B, N)
