@@ -395,7 +395,7 @@ if __name__ == "__main__":
     os.makedirs("./images", exist_ok=True)
 
     # --- Constants ---
-    device = "cpu"
+    device = "cuda"
     batch_size = 2048
     dataset_size = 10_000
     nb_epochs = 500
